@@ -1,0 +1,97 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter/opsz.css";
+
+/* muffle palette: flat graphite surfaces, one lavender accent. */
+@theme {
+  --color-bg: #0e0f11;
+  --color-surface: #15171a;
+  --color-raised: #1c1f23;
+  --color-line: rgb(255 255 255 / 0.06);
+  --color-fg: #e6e7ea;
+  --color-muted: #8b8f98;
+  --color-dim: #5a5e66;
+  --color-accent: #b4a5fc;
+  --color-accent-strong: #8b5cf6;
+  --color-warn: #f5b971;
+  --color-danger: #f28b8b;
+
+  /* Unit types, for the usage chart and the Type column. Checked for colour-blind
+     separation against --color-bg (dataviz validate_palette, all pairs). */
+  --color-type-app: #9085e9;
+  --color-type-user: #199e70;
+  --color-type-system: #d95926;
+
+  /* SF Pro where it exists, Inter (bundled, optical sizes) everywhere else. */
+  --font-sans: "SF Pro Text", -apple-system, "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* macOS text styles (points = px at 1x). Use these, not raw sizes. */
+  --text-title2: 17px;
+  --text-title2--line-height: 22px;
+  --text-title2--font-weight: 600;
+  --text-title2--letter-spacing: -0.01em;
+  --text-title3: 15px;
+  --text-title3--line-height: 20px;
+  --text-title3--font-weight: 600;
+  --text-title3--letter-spacing: -0.005em;
+  --text-headline: 13px;
+  --text-headline--line-height: 16px;
+  --text-headline--font-weight: 600;
+  --text-body: 13px;
+  --text-body--line-height: 16px;
+  --text-callout: 12px;
+  --text-callout--line-height: 15px;
+  --text-subheadline: 11px;
+  --text-subheadline--line-height: 14px;
+  --text-footnote: 10px;
+  --text-footnote--line-height: 13px;
+}
+
+html,
+body {
+  background: transparent;
+}
+
+body {
+  user-select: none;
+  -webkit-user-select: none;
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+::selection {
+  background: rgb(180 165 252 / 0.3);
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.08);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.16);
+}
+
+button {
+  cursor: pointer;
+}
+
+/* WebKitGTK judders on main-thread transforms; give spinners their own layer. */
+.animate-spin {
+  will-change: transform;
+  backface-visibility: hidden;
+}

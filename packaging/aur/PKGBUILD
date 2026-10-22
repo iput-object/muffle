@@ -1,0 +1,18 @@
+# Maintainer: iput-object <motin.isalive@gmail.com>
+pkgname=muffle-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="List running services and apps, and switch groups of them off and on"
+arch=('x86_64')
+url="https://github.com/iput-object/muffle"
+license=('GPL-3.0-only')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'systemd')
+provides=('muffle')
+conflicts=('muffle')
+source=("muffle_${pkgver}_amd64.deb::${url}/releases/download/v${pkgver}/muffle_${pkgver}_amd64.deb")
+# Run `updpkgsums` after each release.
+sha256sums=('SKIP')
+
+package() {
+  bsdtar -xf data.tar.* -C "$pkgdir"
+}
