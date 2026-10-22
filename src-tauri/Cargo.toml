@@ -1,6 +1,6 @@
 [package]
 name = "muffle"
-version = "0.1.0"
+version = "1.0.0"
 description = "List running services and apps, and switch groups of them off and on"
 authors = ["iput-object"]
 license = "GPL-3.0-only"

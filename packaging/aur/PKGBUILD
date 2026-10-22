@@ -1,6 +1,6 @@
 # Maintainer: iput-object <motin.isalive@gmail.com>
 pkgname=muffle-bin
-pkgver=0.1.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="List running services and apps, and switch groups of them off and on"
 arch=('x86_64')
