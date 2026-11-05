@@ -8,6 +8,8 @@ import { cn } from "../utils/cn";
 import { formatCpu } from "../utils/format";
 import { Button } from "./ui/Button";
 import { UnitIcon } from "./UnitIcon";
+import { displayName, unitTitles } from "../utils/displayName";
+import { unitType } from "../utils/unitType";
 
 const MODES: { value: Mode; label: string; hint: string }[] = [
   {
@@ -56,7 +58,10 @@ export function GroupEditor({ group, units, onClose, onSaved, onError }: GroupEd
     const all = [...offline, ...[...live.values()].map((u) => ({ ref: unitRef(u), unit: u as Unit | undefined }))];
     const q = query.trim().toLowerCase();
     return all
-      .filter(({ ref }) => !q || ref.label.toLowerCase().includes(q) || ref.name.toLowerCase().includes(q))
+      .filter(
+        ({ ref }) =>
+          !q || [displayName(ref.label), ref.label, ref.name].some((s) => s.toLowerCase().includes(q)),
+      )
       .sort((a, b) => Number(selected.has(key(b.ref))) - Number(selected.has(key(a.ref))));
   }, [units, selected, query]);
 
@@ -138,6 +143,7 @@ export function GroupEditor({ group, units, onClose, onSaved, onError }: GroupEd
           <ul className="-mx-3 min-h-32 flex-1 overflow-y-auto">
             {choices.map(({ ref, unit }) => {
               const on = selected.has(key(ref));
+              const title = unit ? unitTitles(unit).title : displayName(ref.label || ref.name);
               return (
                 <li key={key(ref)}>
                   <button
@@ -152,9 +158,15 @@ export function GroupEditor({ group, units, onClose, onSaved, onError }: GroupEd
                     >
                       {on && <HugeiconsIcon icon={Tick02Icon} size={11} strokeWidth={2} className="text-white" />}
                     </span>
-                    <UnitIcon icon={unit?.icon} />
+                    <UnitIcon
+                      icon={unit?.icon}
+                      name={title}
+                      type={unitType({ kind: unit?.kind ?? (ref.name.startsWith("app-") ? "app" : "service"), bus: ref.bus })}
+                    />
                     <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                      <span className="truncate text-body text-fg">{ref.label || ref.name}</span>
+                      <span className="truncate text-body text-fg" title={ref.name}>
+                        {title}
+                      </span>
                       {ref.bus === "system" && (
                         <span className="shrink-0 rounded px-1 text-footnote font-medium text-dim ring-1 ring-line">
                           system

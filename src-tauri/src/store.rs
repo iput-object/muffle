@@ -22,6 +22,14 @@ pub struct UnitRef {
     pub label: String,
 }
 
+impl UnitRef {
+    /// Whether this member stands for that unit: the same unit, or another
+    /// instance of the same app (app scopes get a new name on every launch).
+    pub fn matches(&self, bus: Bus, name: &str) -> bool {
+        self.bus == bus && crate::apps::same_unit(&self.name, name)
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
@@ -213,7 +221,7 @@ pub fn add_to_group(id: &str, unit: UnitRef) -> Result<Group, String> {
         .into_iter()
         .find(|g| g.id == id)
         .ok_or("That group no longer exists")?;
-    if !group.units.iter().any(|u| u.bus == unit.bus && u.name == unit.name) {
+    if !group.units.iter().any(|u| u.matches(unit.bus, &unit.name)) {
         group.units.push(unit);
     }
     save_group(group)
@@ -247,16 +255,16 @@ pub fn all_muffled() -> BTreeMap<String, Vec<Muffled>> {
     load_state().muffled
 }
 
-/// Take the entries for these units out of every muffled group, so the caller
-/// can bring them back. The groups stay muffled.
-pub fn release(units: &[(Bus, String)]) -> Result<Vec<Muffled>, String> {
+/// Take the entries for these units (any instance of these apps) out of every
+/// muffled group, so the caller can bring them back. The groups stay muffled.
+pub fn release(units: &[UnitRef]) -> Result<Vec<Muffled>, String> {
     let _guard = LOCK.lock().unwrap();
     let mut state = load_state();
     let mut taken = Vec::new();
     for entries in state.muffled.values_mut() {
         let (hit, keep): (Vec<_>, Vec<_>) = entries
             .drain(..)
-            .partition(|e| units.iter().any(|(bus, name)| *bus == e.unit.bus && *name == e.unit.name));
+            .partition(|e| units.iter().any(|u| u.matches(e.unit.bus, &e.unit.name)));
         *entries = keep;
         taken.extend(hit);
     }
@@ -271,6 +279,27 @@ pub fn set_muffled(group_id: &str, entries: Vec<Muffled>) -> Result<(), String> 
     let mut state = load_state();
     state.muffled.insert(group_id.to_string(), entries);
     save_state(&state)
+}
+
+/// Change a muffled group's entries in place, if it is still muffled. `edit`
+/// returns whether it changed anything (the file is only rewritten then).
+/// Returns false when the group was restored in the meantime.
+pub fn update_muffled(group_id: &str, edit: impl FnOnce(&mut Vec<Muffled>) -> bool) -> Result<bool, String> {
+    let _guard = LOCK.lock().unwrap();
+    let mut state = load_state();
+    let Some(entries) = state.muffled.get_mut(group_id) else { return Ok(false) };
+    if edit(entries) {
+        save_state(&state)?;
+    }
+    Ok(true)
+}
+
+/// Add entries to a muffled group, replacing any for the same unit.
+pub fn record(entries: &mut Vec<Muffled>, new: Vec<Muffled>) {
+    for entry in new {
+        entries.retain(|e| !(e.unit.bus == entry.unit.bus && e.unit.name == entry.unit.name));
+        entries.push(entry);
+    }
 }
 
 pub fn clear_muffled(group_id: &str) -> Result<(), String> {
@@ -294,4 +323,34 @@ pub fn set_startup_off(unit: UnitRef, off: bool) -> Result<(), String> {
         state.startup_off.push(unit);
     }
     save_state(&state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn unit(bus: Bus, name: &str) -> UnitRef {
+        UnitRef { bus, name: name.into(), label: String::new() }
+    }
+
+    #[test]
+    fn services_match_by_name_and_bus() {
+        let u = unit(Bus::System, "docker.service");
+        assert!(u.matches(Bus::System, "docker.service"));
+        assert!(!u.matches(Bus::Session, "docker.service"));
+        assert!(!u.matches(Bus::System, "containerd.service"));
+    }
+
+    #[test]
+    fn record_replaces_entries_for_the_same_unit() {
+        let mut list = vec![Muffled { unit: unit(Bus::System, "a.service"), action: Action::Stopped }];
+        record(
+            &mut list,
+            vec![
+                Muffled { unit: unit(Bus::System, "a.service"), action: Action::Stopped },
+                Muffled { unit: unit(Bus::Session, "app-niri-x-1.scope"), action: Action::Paused },
+            ],
+        );
+        assert_eq!(list.len(), 2);
+    }
 }

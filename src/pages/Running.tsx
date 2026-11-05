@@ -7,6 +7,8 @@ import { ROW_GRID, UnitRow, type RowAction } from "../components/UnitRow";
 import { TypeFilter } from "../components/TypeFilter";
 import { UsageChart } from "../components/UsageChart";
 import { unitType, type UnitType } from "../utils/unitType";
+import { unitTitles } from "../utils/displayName";
+import { useFlash, type Flash } from "../hooks/useFlash";
 
 type RunningProps = {
   snapshot: Snapshot | null;
@@ -15,9 +17,12 @@ type RunningProps = {
   onEditGroup: (group: Group) => void;
   /** Search text from the title bar. */
   query: string;
+  /** A unit picked in search, to scroll to and flash. */
+  flash: Flash;
 };
 
-export default function Running({ snapshot, refresh, notify, onEditGroup, query }: RunningProps) {
+export default function Running({ snapshot, refresh, notify, onEditGroup, query, flash }: RunningProps) {
+  useFlash(flash, !!snapshot);
   const [filter, setFilter] = useState<UnitType | null>(null);
   const [showProtected, setShowProtected] = useState(false);
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -36,7 +41,7 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query 
     return running.filter(
       (u) =>
         (showProtected || !u.protected) &&
-        (!q || u.label.toLowerCase().includes(q) || u.name.toLowerCase().includes(q)),
+        (!q || [unitTitles(u).title, u.label, u.name].some((s) => s.toLowerCase().includes(q))),
     );
   }, [running, query, showProtected]);
   const visible = filter ? searched.filter((u) => unitType(u) === filter) : searched;
@@ -97,7 +102,7 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query 
   return (
     <Page className="pt-0">
       {snapshot && (
-        <div className="pt-4 pb-3">
+        <div className="-mx-4 pt-5 pb-4">
           <UsageChart snapshot={snapshot} filter={filter} onFilter={setFilter} />
         </div>
       )}
@@ -105,7 +110,7 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query 
       {/* Inside the scroller so it shares the rows' grid, padding and scrollbar gutter. */}
       <div
         className={cn(
-          "sticky top-0 z-10 -mx-3 grid gap-3 border-b border-line bg-bg px-3 py-1.5 text-subheadline text-muted",
+          "sticky top-0 z-10 -mx-4 grid gap-3 border-b border-line bg-bg px-4 py-2 text-subheadline text-muted",
           ROW_GRID,
         )}
       >
@@ -120,7 +125,6 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query 
         />
         <span className="text-right">CPU</span>
         <span className="text-right">Memory</span>
-        <span />
       </div>
 
       {!snapshot ? (
@@ -128,7 +132,7 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query 
       ) : visible.length === 0 && stoppedList.length === 0 ? (
         <Empty>Nothing matches.</Empty>
       ) : (
-        <ul className="-mx-3 pt-1">
+        <ul className="-mx-4 pt-1">
           {stoppedList.map((unit) => (
             <UnitRow key={unit.id} stopped {...rowProps(unit)} />
           ))}

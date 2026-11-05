@@ -18,6 +18,8 @@ export type Unit = {
   memBytes: number;
   frozen: boolean;
   protected: boolean;
+  /** Ids of the groups this unit belongs to (matched by app, across launches). */
+  groups: string[];
 };
 
 export type UnitRef = { bus: Bus; name: string; label: string };

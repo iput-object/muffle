@@ -4,8 +4,16 @@ import { cn } from "../utils/cn";
 import type { Notify } from "../components/StatusBar";
 import { Empty, Page, Section } from "../components/Page";
 import { UnitIcon } from "../components/UnitIcon";
+import { unitTitles } from "../utils/displayName";
+import { unitType } from "../utils/unitType";
+import { useFlash, type Flash } from "../hooks/useFlash";
 
-function Switch({ checked, disabled, onChange, label }: {
+function Switch({
+  checked,
+  disabled,
+  onChange,
+  label,
+}: {
   checked: boolean;
   disabled: boolean;
   onChange: (v: boolean) => void;
@@ -33,42 +41,59 @@ function Switch({ checked, disabled, onChange, label }: {
   );
 }
 
-function StartupRows({ items, busy, onToggle }: {
+function StartupRows({
+  items,
+  busy,
+  onToggle,
+}: {
   items: StartupItem[];
   busy: Set<string>;
   onToggle: (item: StartupItem, enabled: boolean) => void;
 }) {
   return (
     <ul className="divide-y divide-line rounded-lg bg-surface ring-1 ring-line">
-      {items.map((item) => (
-        <li key={item.id} className="flex items-center gap-3 px-3 py-2.5">
-          <UnitIcon icon={item.icon} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className={cn("truncate text-body", item.enabled ? "text-fg" : "text-muted")}>
-                {item.label}
-              </span>
-              {item.bus === "system" && (
-                <span className="shrink-0 rounded px-1 text-footnote font-medium text-dim ring-1 ring-line">system</span>
-              )}
+      {items.map((item) => {
+        const { title, detail, detailIsId } = unitTitles(item);
+        return (
+          <li
+            key={item.id}
+            data-flash-id={item.id}
+            className="flex items-center gap-3 px-3.5 py-2.5 first:rounded-t-lg last:rounded-b-lg"
+          >
+            <UnitIcon
+              icon={item.icon}
+              name={title}
+              type={unitType(item)}
+              className={cn(!item.enabled && "opacity-50 grayscale")}
+            />
+            <div className="min-w-0 flex-1">
+              <p className={cn("truncate text-body", item.enabled ? "text-fg" : "text-muted")} title={title}>
+                {title}
+              </p>
+              <p
+                className={cn("truncate text-subheadline text-muted", detailIsId && "font-mono text-[10.5px] text-dim")}
+                title={item.name}
+              >
+                {detail}
+              </p>
             </div>
-            <p className="truncate text-subheadline text-muted">{item.description || item.name}</p>
-          </div>
-          <Switch
-            label={`Start ${item.label} automatically`}
-            checked={item.enabled}
-            disabled={busy.has(item.id)}
-            onChange={(v) => onToggle(item, v)}
-          />
-        </li>
-      ))}
+            <Switch
+              label={`Start ${item.label} automatically`}
+              checked={item.enabled}
+              disabled={busy.has(item.id)}
+              onChange={(v) => onToggle(item, v)}
+            />
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-export default function Startup({ notify }: { notify: Notify }) {
+export default function Startup({ notify, flash }: { notify: Notify; flash: Flash }) {
   const [list, setList] = useState<StartupList | null>(null);
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  useFlash(flash, !!list);
 
   const load = useCallback(async () => {
     try {
@@ -86,7 +111,9 @@ export default function Startup({ notify }: { notify: Notify }) {
     setBusy((s) => new Set(s).add(item.id));
     try {
       await api.setStartup(item, enabled);
-      notify(`${item.label} ${enabled ? "will" : "won't"} start ${item.kind === "app" ? "at next login" : "automatically"}`);
+      notify(
+        `${item.label} ${enabled ? "will" : "won't"} start ${item.kind === "app" ? "at next login" : "automatically"}`,
+      );
       await load();
     } catch (e) {
       notify(`${item.label}: ${e}`, "error");
@@ -107,22 +134,30 @@ export default function Startup({ notify }: { notify: Notify }) {
     );
   }
 
+  const on = (items: StartupItem[]) => items.filter((i) => i.enabled).length;
+
   return (
     <Page>
-      <Section title="Apps · start when you log in">
-        {list.apps.length ? (
-          <StartupRows items={list.apps} busy={busy} onToggle={toggle} />
-        ) : (
-          <Empty>No login apps.</Empty>
-        )}
-      </Section>
-      <Section title="Services · start at boot or login">
-        {list.services.length ? (
-          <StartupRows items={list.services} busy={busy} onToggle={toggle} />
-        ) : (
-          <Empty>No services enabled.</Empty>
-        )}
-      </Section>
+      <div className="grid grid-cols-2 items-start gap-5">
+        <Section title="Apps" note="Start when you log in" aside={`${on(list.apps)} of ${list.apps.length} on`}>
+          {list.apps.length ? (
+            <StartupRows items={list.apps} busy={busy} onToggle={toggle} />
+          ) : (
+            <Empty>No login apps.</Empty>
+          )}
+        </Section>
+        <Section
+          title="Services"
+          note="Start at boot or login"
+          aside={`${on(list.services)} of ${list.services.length} on`}
+        >
+          {list.services.length ? (
+            <StartupRows items={list.services} busy={busy} onToggle={toggle} />
+          ) : (
+            <Empty>No services enabled.</Empty>
+          )}
+        </Section>
+      </div>
     </Page>
   );
 }

@@ -153,17 +153,20 @@ impl Buses {
         Ok(out)
     }
 
-    /// Service unit files enabled to start at boot (system) or login (session).
-    pub async fn enabled_services(&self, bus: Bus) -> zbus::Result<Vec<String>> {
+    /// Service unit files that can start at boot (system) or login (session),
+    /// with whether they currently do: enabled ones, and disabled ones that
+    /// could be enabled. Static, masked and template (`@`) units are left out,
+    /// since there's nothing to switch.
+    pub async fn startup_services(&self, bus: Bus) -> zbus::Result<Vec<(String, bool)>> {
         let files = self
             .manager(bus)
             .await?
-            .list_unit_files_by_patterns(&["enabled"], &["*.service"])
+            .list_unit_files_by_patterns(&["enabled", "disabled"], &["*.service"])
             .await?;
         Ok(files
             .into_iter()
-            .filter_map(|(path, _)| path.rsplit('/').next().map(str::to_string))
-            .filter(|name| !name.contains('@'))
+            .filter_map(|(path, state)| Some((path.rsplit('/').next()?.to_string(), state == "enabled")))
+            .filter(|(name, _)| !name.contains('@'))
             .collect())
     }
 

@@ -69,7 +69,7 @@ impl Sampler {
                 next.insert(path.clone(), (cur, now));
             }
             let mem_bytes = read_mem(&path);
-            let frozen = fs::read_to_string(path.join("cgroup.freeze")).is_ok_and(|v| v.trim() == "1");
+            let frozen = is_frozen(&path);
             out.insert((bus, name), Usage { cpu: cpu.min(100.0), mem_bytes, frozen });
         }
 
@@ -93,6 +93,26 @@ impl Sampler {
             mem_total,
         }
     }
+}
+
+/// Every unit cgroup on the machine and whether it is frozen, keyed by
+/// (bus, unit name). A cheap walk with no CPU bookkeeping, so it can run
+/// alongside a `Sampler` without disturbing its deltas.
+pub fn cgroup_units() -> HashMap<(Bus, String), bool> {
+    let mut found = Vec::new();
+    let user_manager = format!("user@{}.service", current_uid());
+    walk(Path::new(CGROUP_ROOT), Bus::System, &user_manager, &mut found);
+    found
+        .into_iter()
+        .map(|(bus, name, path)| {
+            let frozen = is_frozen(&path);
+            ((bus, name), frozen)
+        })
+        .collect()
+}
+
+fn is_frozen(cgroup: &Path) -> bool {
+    fs::read_to_string(cgroup.join("cgroup.freeze")).is_ok_and(|v| v.trim() == "1")
 }
 
 /// Collect `.service` / `.scope` cgroups. Descends into slices and into this

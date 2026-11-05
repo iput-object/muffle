@@ -27,7 +27,9 @@ export default function Settings({ notify, onSettingsChanged, updater }: Setting
   const [protectedText, setProtectedText] = useState("");
 
   useEffect(() => {
-    isEnabled().then(setAutostart).catch(() => {});
+    isEnabled()
+      .then(setAutostart)
+      .catch(() => {});
     api
       .getSettings()
       .then((s) => {
@@ -75,71 +77,74 @@ export default function Settings({ notify, onSettingsChanged, updater }: Setting
 
   return (
     <Page>
-      <Section title="General">
-        <div className="divide-y divide-line rounded-lg bg-surface px-4 ring-1 ring-line">
-          <Toggle
-            label="Start at login"
-            description="Open hidden in the tray when you log in"
-            checked={autostart}
-            onChange={toggleAutostart}
-          />
-          <Toggle
-            label="Show tray icon"
-            description="Muffle and restore groups from the tray"
-            checked={showTray}
-            onChange={toggleTray}
-          />
-          <div className="flex items-center justify-between gap-4 py-3">
-            <div className="flex flex-col">
-              <span className="text-body text-fg">Refresh every</span>
-              <span className="mt-0.5 text-subheadline text-muted">Only while the window is open</span>
+      <div className="mb-7 grid grid-cols-2 gap-5">
+        <div>
+          <Section title="General">
+            <div className="divide-y divide-line rounded-lg bg-surface px-4 ring-1 ring-line">
+              <Toggle
+                label="Start at login"
+                description="Open hidden in the tray when you log in"
+                checked={autostart}
+                onChange={toggleAutostart}
+              />
+              <Toggle
+                label="Show tray icon"
+                description="Muffle and restore groups from the tray"
+                checked={showTray}
+                onChange={toggleTray}
+              />
+              <div className="flex items-center justify-between gap-4 py-3">
+                <div className="flex flex-col">
+                  <span className="text-body text-fg">Refresh every</span>
+                  <span className="mt-0.5 text-subheadline text-muted">Only while the window is open</span>
+                </div>
+                <Segmented
+                  className="bg-bg"
+                  options={INTERVALS.map((n) => ({ value: n, label: `${n}s` }))}
+                  value={settings?.refreshSeconds}
+                  onChange={(n) => save({ refreshSeconds: n }, `Refreshing every ${n}s`)}
+                />
+              </div>
             </div>
-            <Segmented
-              className="bg-bg"
-              options={INTERVALS.map((n) => ({ value: n, label: `${n}s` }))}
-              value={settings?.refreshSeconds}
-              onChange={(n) => save({ refreshSeconds: n }, `Refreshing every ${n}s`)}
-            />
-          </div>
-        </div>
-      </Section>
+          </Section>
 
-      <Section title="Protected">
-        <div className="rounded-lg bg-surface p-4 ring-1 ring-line">
-          <p className="mb-3 text-callout text-muted">
-            muffle never stops these. Add your own, one per line: an exact unit name,{" "}
-            <code className="text-muted">prefix*</code>, <code className="text-muted">*suffix</code> or{" "}
-            <code className="text-muted">*part*</code>.
-          </p>
-          <textarea
-            value={protectedText}
-            onChange={(e) => setProtectedText(e.target.value)}
-            rows={4}
-            spellCheck={false}
-            placeholder="app-niri-noctalia*"
-            className="w-full resize-none rounded-md bg-bg px-3 py-2 font-mono text-callout text-fg ring-1 ring-line outline-none select-text placeholder:text-dim focus:ring-accent/40"
-          />
-          <div className="mt-2 flex items-center justify-between gap-4">
-            <p className="truncate font-mono text-footnote text-dim" title={settings?.builtInProtected.join("  ")}>
-              Built in: {settings?.builtInProtected.join("  ")}
+          <Section title="Updates">
+            <UpdateRow updater={updater} />
+          </Section>
+        </div>
+
+        <Section title="Protected" note="Never stopped by muffle" className="flex flex-col">
+          <div className="flex flex-1 flex-col rounded-lg bg-surface p-4 ring-1 ring-line">
+            <p className="mb-3 text-callout text-muted">
+              Add your own, one per line: an exact unit name, <code className="text-muted">prefix*</code>,{" "}
+              <code className="text-muted">*suffix</code> or <code className="text-muted">*part*</code>.
             </p>
-            <Button
-              variant="primary"
-              disabled={!protectedDirty}
-              onClick={() => save({ protected: protectedList }, "Protected list saved")}
-            >
-              Save
-            </Button>
+            <textarea
+              value={protectedText}
+              onChange={(e) => setProtectedText(e.target.value)}
+              rows={5}
+              spellCheck={false}
+              placeholder="app-niri-noctalia*"
+              className="w-full flex-1 resize-none rounded-md bg-bg px-3 py-2 font-mono text-callout text-fg ring-1 ring-line outline-none select-text placeholder:text-dim focus:ring-accent/40"
+            />
+            <div className="mt-2 flex items-center justify-between gap-4">
+              <p className="truncate font-mono text-footnote text-dim" title={settings?.builtInProtected.join("  ")}>
+                Built in: {settings?.builtInProtected.join("  ")}
+              </p>
+              <Button
+                variant="primary"
+                disabled={!protectedDirty}
+                onClick={() => save({ protected: protectedList }, "Protected list saved")}
+              >
+                Save
+              </Button>
+            </div>
           </div>
-        </div>
-      </Section>
-
-      <Section title="Updates">
-        <UpdateRow updater={updater} />
-      </Section>
+        </Section>
+      </div>
 
       <Section title="Keyboard shortcuts">
-        <ul className="grid grid-cols-2 gap-x-6 rounded-lg bg-surface px-4 py-2 ring-1 ring-line">
+        <ul className="grid grid-cols-2 gap-x-10 rounded-lg bg-surface px-4 py-2 ring-1 ring-line">
           {SHORTCUTS.map((s) => (
             <li key={s.keys} className="flex h-8 items-center justify-between gap-3">
               <span className="text-body text-fg">{s.label}</span>

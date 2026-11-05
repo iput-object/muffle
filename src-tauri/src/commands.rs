@@ -1,12 +1,13 @@
 //! Commands the window calls. One `snapshot` per refresh tick returns
 //! everything live (units, totals, groups); the rest act on one thing.
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::apps::AppCache;
+use crate::apps::{self, AppCache};
 use crate::groups::{self, Outcome};
 use crate::metrics::Sampler;
 use crate::protect::Protect;
@@ -39,6 +40,11 @@ pub struct Unit {
     mem_bytes: u64,
     frozen: bool,
     protected: bool,
+    /// Ids of the groups this unit belongs to, by app identity (any launch).
+    groups: Vec<String>,
+    /// Other scopes of the same app launch, folded into this row (see
+    /// `apps::launch_id`). Row actions apply to them too.
+    siblings: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -95,7 +101,9 @@ pub async fn snapshot(app: AppHandle, state: State<'_, AppState>) -> Result<Snap
         (sampler.units(), sampler.system())
     };
 
-    let mut units: Vec<Unit> = {
+    let groups = group_views()?;
+
+    let units: Vec<Unit> = {
         let mut apps = state.apps.lock().unwrap();
         raw.into_iter()
             .filter(|u| !u.is_container())
@@ -106,6 +114,12 @@ pub async fn snapshot(app: AppHandle, state: State<'_, AppState>) -> Result<Snap
                 Unit {
                     id: format!("{}:{}", u.bus.as_str(), u.name),
                     protected: protect.is_protected(&u.name),
+                    groups: groups
+                        .iter()
+                        .filter(|g| g.group.units.iter().any(|m| m.matches(u.bus, &u.name)))
+                        .map(|g| g.group.id.clone())
+                        .collect(),
+                    siblings: Vec::new(),
                     label: info.name.unwrap_or_else(|| stem(&u.name).to_string()),
                     icon: info.icon,
                     kind: if is_app { "app" } else { "service" },
@@ -119,9 +133,8 @@ pub async fn snapshot(app: AppHandle, state: State<'_, AppState>) -> Result<Snap
             })
             .collect()
     };
+    let mut units = merge_launches(units);
     units.sort_by(|a, b| b.cpu.total_cmp(&a.cpu).then(b.mem_bytes.cmp(&a.mem_bytes)));
-
-    let groups = group_views()?;
     sync_tray(&app, &state, &groups);
 
     Ok(Snapshot {
@@ -131,6 +144,59 @@ pub async fn snapshot(app: AppHandle, state: State<'_, AppState>) -> Result<Snap
         mem_used: system.mem_used,
         mem_total: system.mem_total,
     })
+}
+
+/// Fold the scopes of one app launch into a single row: the one with an icon
+/// (else the biggest) leads, usage is summed, and it counts as paused only
+/// when every part is.
+fn merge_launches(units: Vec<Unit>) -> Vec<Unit> {
+    let mut out: Vec<Unit> = Vec::with_capacity(units.len());
+    let mut lead_of: HashMap<(Bus, String), usize> = HashMap::new();
+    for unit in units {
+        let Some(launch) = apps::launch_id(&unit.name).map(str::to_string) else {
+            out.push(unit);
+            continue;
+        };
+        let Some(&i) = lead_of.get(&(unit.bus, launch.clone())) else {
+            lead_of.insert((unit.bus, launch), out.len());
+            out.push(unit);
+            continue;
+        };
+        let lead = &mut out[i];
+        let takes_lead = (unit.icon.is_some(), unit.mem_bytes) > (lead.icon.is_some(), lead.mem_bytes);
+        let mut part = unit;
+        if takes_lead {
+            std::mem::swap(lead, &mut part);
+            lead.siblings.append(&mut part.siblings);
+        }
+        lead.cpu += part.cpu;
+        lead.mem_bytes += part.mem_bytes;
+        lead.frozen &= part.frozen;
+        lead.protected |= part.protected;
+        for g in part.groups {
+            if !lead.groups.contains(&g) {
+                lead.groups.push(g);
+            }
+        }
+        lead.siblings.push(part.name);
+    }
+    out
+}
+
+/// This unit plus the other scopes of its app launch, if it's an app.
+async fn with_siblings(buses: &Buses, bus: Bus, name: &str) -> Vec<String> {
+    let mut names = vec![name.to_string()];
+    if apps::launch_id(name).is_some() {
+        if let Ok(units) = buses.units(bus).await {
+            names.extend(
+                units
+                    .into_iter()
+                    .filter(|u| u.is_running() && apps::same_launch(name, &u.name))
+                    .map(|u| u.name),
+            );
+        }
+    }
+    names
 }
 
 // ── Single units ─────────────────────────────────────────────────────────────
@@ -145,26 +211,59 @@ fn ensure_unprotected(name: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn stop_unit(state: State<'_, AppState>, bus: Bus, name: String) -> Result<(), String> {
     ensure_unprotected(&name)?;
-    state.buses.stop(bus, &name).await.map_err(|e| e.to_string())
+    for name in with_siblings(&state.buses, bus, &name).await {
+        state.buses.stop(bus, &name).await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn start_unit(state: State<'_, AppState>, bus: Bus, name: String) -> Result<(), String> {
-    state.buses.start(bus, &name).await.map_err(|e| e.to_string())
+    for name in with_siblings(&state.buses, bus, &name).await {
+        state.buses.start(bus, &name).await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn pause_unit(state: State<'_, AppState>, bus: Bus, name: String) -> Result<(), String> {
     ensure_unprotected(&name)?;
-    state.buses.freeze(bus, &name).await.map_err(|e| e.to_string())
+    for name in with_siblings(&state.buses, bus, &name).await {
+        state.buses.freeze(bus, &name).await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn resume_unit(state: State<'_, AppState>, bus: Bus, name: String) -> Result<(), String> {
-    state.buses.thaw(bus, &name).await.map_err(|e| e.to_string())
+    for name in with_siblings(&state.buses, bus, &name).await {
+        state.buses.thaw(bus, &name).await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 // ── Groups ───────────────────────────────────────────────────────────────────
+
+/// Keep muffled groups muffled while the app runs (it autostarts in the tray):
+/// one pass right away, so a block is back as soon as possible after a reboot,
+/// then every few seconds to catch relaunched apps and restarted services.
+pub fn start_enforcer(app: &AppHandle) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        loop {
+            let state = app.state::<AppState>();
+            match tauri::async_runtime::block_on(groups::enforce(&state.buses)) {
+                Ok(outcome) => {
+                    for e in outcome.errors {
+                        eprintln!("enforce: {e}");
+                    }
+                }
+                Err(e) => eprintln!("enforce: {e}"),
+            }
+            std::thread::sleep(std::time::Duration::from_secs(3));
+        }
+    });
+}
 
 /// Tell the window and the tray that groups changed.
 pub fn groups_changed(app: &AppHandle) {

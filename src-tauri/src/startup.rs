@@ -1,5 +1,5 @@
 //! What starts on its own: login apps (XDG autostart entries) and services
-//! enabled at boot (system bus) or login (session bus).
+//! that start, or could start, at boot (system bus) or login (session bus).
 //!
 //! Apps are turned off the XDG way: a copy in `~/.config/autostart` with
 //! `Hidden=true`. `systemctl disable` can't do it, since their units are
@@ -78,11 +78,14 @@ async fn list_services(buses: &Buses) -> Result<Vec<StartupItem>, String> {
 
     let mut items = Vec::new();
     for bus in [Bus::Session, Bus::System] {
-        let enabled = buses.enabled_services(bus).await.map_err(|e| e.to_string())?;
-        let off = store::startup_off().into_iter().filter(|u| u.bus == bus).map(|u| u.name);
-        let all = enabled.iter().map(|n| (n.clone(), true)).chain(
-            off.filter(|n| !enabled.contains(n)).map(|n| (n, false)),
-        );
+        let mut all = buses.startup_services(bus).await.map_err(|e| e.to_string())?;
+        // Also anything muffle turned off whose file systemd no longer lists
+        // as disabled (e.g. it changed state since), so it can be turned back on.
+        for unit in store::startup_off().into_iter().filter(|u| u.bus == bus) {
+            if !all.iter().any(|(n, _)| *n == unit.name) {
+                all.push((unit.name, false));
+            }
+        }
         for (name, on) in all {
             if protect.is_protected(&name) {
                 continue;

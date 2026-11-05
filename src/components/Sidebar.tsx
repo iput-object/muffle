@@ -27,13 +27,13 @@ type SidebarProps = {
 
 export function Sidebar({ page, onNavigate, counts }: SidebarProps) {
   return (
-    <aside className="flex w-48 shrink-0 flex-col border-r border-line bg-surface">
+    <aside className="flex w-52 shrink-0 flex-col border-r border-line bg-surface">
       <div data-tauri-drag-region className="flex h-12 shrink-0 items-center gap-2 px-4">
         <img src={logo} alt="" className="pointer-events-none h-5 w-5" />
         <span className="pointer-events-none text-headline">muffle</span>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 px-2 py-2">
+      <nav className="flex flex-1 flex-col gap-0.5 px-2.5 py-2">
         {ITEMS.map((item) => (
           <NavItem
             key={item.page}
@@ -45,7 +45,7 @@ export function Sidebar({ page, onNavigate, counts }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="flex flex-col border-t border-line px-2 py-2">
+      <div className="flex flex-col border-t border-line px-2.5 py-2.5">
         <NavItem
           label="Settings"
           icon={Settings02Icon}
@@ -71,7 +71,7 @@ function NavItem({ label, icon, active, count, onClick }: NavItemProps) {
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex h-7 items-center gap-2.5 rounded-md px-2.5 text-body transition-colors",
+        "flex h-8 items-center gap-2.5 rounded-md px-2.5 text-body transition-colors",
         active ? "bg-raised text-fg" : "text-muted hover:bg-raised/60 hover:text-fg",
       )}
     >

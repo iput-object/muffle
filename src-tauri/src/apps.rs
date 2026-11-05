@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
 
 use base64::Engine;
 
@@ -59,6 +60,85 @@ fn fallback_name(unit: &str) -> Option<String> {
         segments.pop();
     }
     segments.last().map(|s| s.replace("\\x2d", "-"))
+}
+
+// ── Identity ─────────────────────────────────────────────────────────────────
+
+/// `app_key` per unit name, shared by the window, the tray and the CLI.
+static KEYS: LazyLock<Mutex<HashMap<String, Option<String>>>> = LazyLock::new(Default::default);
+
+/// Stable identity of the app behind an `app-*` unit, the same for every
+/// launch, launcher and boot: the desktop id when its `.desktop` file is
+/// found, else the app id from the unit name. Lowercase. `None` for anything
+/// that isn't an app unit (plain services are identified by their name).
+pub fn app_key(unit: &str) -> Option<String> {
+    if !unit.starts_with("app-") {
+        return None;
+    }
+    if let Some(key) = KEYS.lock().unwrap().get(unit) {
+        return key.clone();
+    }
+    let key = resolve_key(unit);
+    KEYS.lock().unwrap().insert(unit.to_string(), key.clone());
+    key
+}
+
+fn resolve_key(unit: &str) -> Option<String> {
+    let fallback = fallback_key(unit)?;
+    app_id_candidates(unit)
+        .iter()
+        .find_map(|id| find_desktop(id))
+        .or_else(|| find_desktop_by_suffix(std::slice::from_ref(&fallback)))
+        .and_then(|path| Some(path.file_stem()?.to_str()?.to_lowercase()))
+        .or(Some(fallback))
+}
+
+/// Whether two unit names stand for the same thing: the very same unit, or
+/// two instances of the same app (`app-niri-firefox-12.scope` and
+/// `app-gnome-firefox-34.scope`).
+pub fn same_unit(a: &str, b: &str) -> bool {
+    same_unit_by(a, b, app_key)
+}
+
+fn same_unit_by(a: &str, b: &str, key: impl Fn(&str) -> Option<String>) -> bool {
+    a == b || matches!((key(a), key(b)), (Some(x), Some(y)) if x == y)
+}
+
+/// The launch an app scope belongs to: its trailing PID. One launch can span
+/// several scopes when the app moves its own main process into a scope of its
+/// own: Chrome launched from GNOME runs as both
+/// `app-gnome-google\x2dchrome-697193.scope` (renderers, GPU, ...) and
+/// `app-com.google.Chrome-697193.scope` (the browser process). They are one app.
+pub fn launch_id(unit: &str) -> Option<&str> {
+    let rest = unit.strip_prefix("app-")?.strip_suffix(".scope")?;
+    let (_, last) = rest.rsplit_once('-')?;
+    (!last.is_empty() && last.chars().all(|c| c.is_ascii_digit())).then_some(last)
+}
+
+/// Whether two units are parts of the same app launch (and not the same unit).
+pub fn same_launch(a: &str, b: &str) -> bool {
+    a != b && matches!((launch_id(a), launch_id(b)), (Some(x), Some(y)) if x == y)
+}
+
+/// The app id from an app unit's name alone, without the launcher prefix,
+/// random suffix or instance: `app-niri-firefox-1234.scope` -> `firefox`,
+/// `app-arch\x2dupdate@autostart.service` -> `arch-update`.
+fn fallback_key(unit: &str) -> Option<String> {
+    let rest = unit.strip_prefix("app-")?;
+    let (rest, is_scope) = match rest.strip_suffix(".scope") {
+        Some(r) => (r, true),
+        None => (rest.strip_suffix(".service").unwrap_or(rest), false),
+    };
+    let rest = rest.split('@').next().unwrap_or(rest);
+    let mut segments: Vec<&str> = rest.split('-').collect();
+    // Scopes end in a random number or hex id.
+    if is_scope && segments.len() > 1 && segments.last().is_some_and(|s| s.chars().all(|c| c.is_ascii_hexdigit())) {
+        segments.pop();
+    }
+    segments
+        .last()
+        .filter(|s| !s.is_empty())
+        .map(|s| s.replace("\\x2d", "-").to_lowercase())
 }
 
 /// Possible desktop ids for an app unit. systemd names them
@@ -185,6 +265,39 @@ mod tests {
         let c = app_id_candidates("app-niri-firefox-1234.scope");
         assert!(c.contains(&"firefox".to_string()));
         assert!(c.contains(&"niri-firefox".to_string()));
+    }
+
+    #[test]
+    fn key_ignores_launcher_and_random_suffix() {
+        assert_eq!(fallback_key("app-niri-firefox-1234.scope").as_deref(), Some("firefox"));
+        assert_eq!(fallback_key("app-gnome-Firefox-99.scope").as_deref(), Some("firefox"));
+        assert_eq!(fallback_key("app-firefox-1a2b3c.scope").as_deref(), Some("firefox"));
+        assert_eq!(fallback_key("app-gnome-org.mozilla.firefox-5.scope").as_deref(), Some("org.mozilla.firefox"));
+        assert_eq!(fallback_key("app-arch\\x2dupdate\\x2dtray@autostart.service").as_deref(), Some("arch-update-tray"));
+        assert_eq!(fallback_key("app-niri-firefox@abc.service").as_deref(), Some("firefox"));
+        assert_eq!(fallback_key("docker.service"), None);
+    }
+
+    #[test]
+    fn scopes_of_one_launch_are_one_app() {
+        assert_eq!(launch_id("app-gnome-google\\x2dchrome-697193.scope"), Some("697193"));
+        assert!(same_launch("app-gnome-google\\x2dchrome-697193.scope", "app-com.google.Chrome-697193.scope"));
+        assert!(!same_launch("app-com.google.Chrome-697193.scope", "app-com.google.Chrome-697193.scope"));
+        assert!(!same_launch("app-gnome-firefox-1.scope", "app-gnome-chromium-2.scope"));
+        assert_eq!(launch_id("app-firefox@autostart.service"), None);
+        assert_eq!(launch_id("docker.service"), None);
+    }
+
+    #[test]
+    fn same_app_across_launches() {
+        let same = |a, b| same_unit_by(a, b, fallback_key);
+        assert!(same("app-niri-firefox-1234.scope", "app-gnome-firefox-99.scope"));
+        assert!(same("app-niri-firefox-1234.scope", "app-niri-firefox-1234.scope"));
+        assert!(same("app-firefox@autostart.service", "app-niri-firefox-7.scope"));
+        assert!(!same("app-niri-firefox-1234.scope", "app-niri-chromium-1234.scope"));
+        assert!(same("foo.service", "foo.service"));
+        assert!(!same("foo.service", "bar.service"));
+        assert!(!same("foo.service", "app-niri-foo-1.scope"));
     }
 
     #[test]

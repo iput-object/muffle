@@ -24,10 +24,19 @@ pub fn run() {
 
     let is_hidden_startup = is_hidden_startup();
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default();
+
+    // Release builds only: a dev build shares the identifier with the installed
+    // app, so single-instance would hand off to it and exit, killing `tauri dev`.
+    #[cfg(not(debug_assertions))]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             tray::show_main(app);
-        }))
+        }));
+    }
+
+    builder
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .args(["--hidden"])
@@ -44,6 +53,7 @@ pub fn run() {
                 apps: Mutex::new(apps::AppCache::default()),
                 tray_key: Mutex::new(String::new()),
             });
+            commands::start_enforcer(app.handle());
 
             let handle = app.handle().clone();
             app.handle().run_on_main_thread(move || {

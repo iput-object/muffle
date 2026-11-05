@@ -6,7 +6,7 @@ export function TitleBar({ title, children }: { title: string; children?: ReactN
   return (
     <header
       data-tauri-drag-region
-      className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-3 pl-5"
+      className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-3 pl-7"
     >
       <h1 className="pointer-events-none flex-1 text-title3">{title}</h1>
       {children && (

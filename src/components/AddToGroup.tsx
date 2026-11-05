@@ -11,7 +11,7 @@ type AddToGroupProps = {
   onNewGroup: () => void;
 };
 
-/** ＋ button on a row: pick a group to add this unit to, or start a new one. */
+/** Add button on a row: pick a group to add this unit to, or start a new one. */
 export function AddToGroup({ unit, groups, onAdd, onNewGroup }: AddToGroupProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -25,7 +25,7 @@ export function AddToGroup({ unit, groups, onAdd, onNewGroup }: AddToGroupProps)
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
-  const inGroup = (g: GroupView) => g.units.some((u) => u.bus === unit.bus && u.name === unit.name);
+  const inGroup = (g: GroupView) => unit.groups.includes(g.id);
 
   return (
     <div ref={ref} className="relative">
