@@ -144,7 +144,7 @@ function App() {
             />
           </TitleBar>
 
-          <main className="flex min-h-0 flex-1 flex-col">
+          <main className="relative flex min-h-0 flex-1 flex-col">
             {page === "running" && <Running {...pageProps} query={runningQuery} />}
             {page === "groups" && <Groups {...pageProps} />}
             {page === "startup" && <Startup notify={notify} flash={flash} />}

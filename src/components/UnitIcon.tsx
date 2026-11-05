@@ -9,6 +9,7 @@ const TINT: Record<UnitType, string> = {
 };
 
 const SIZE = {
+  lg: { box: "h-8 w-8 rounded-[8px] text-[15px]", img: "h-8 w-8" },
   md: { box: "h-[22px] w-[22px] rounded-[6px] text-[11px]", img: "h-[22px] w-[22px]" },
   sm: { box: "h-4 w-4 rounded-[4px] text-[9px]", img: "h-4 w-4" },
 };

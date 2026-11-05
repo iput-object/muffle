@@ -14,6 +14,8 @@
   --color-accent-strong: #8b5cf6;
   --color-warn: #f5b971;
   --color-danger: #f28b8b;
+  /* Running-state dot only; kept off the type hues so "running" never reads as "user". */
+  --color-ok: #8fd4a8;
 
   /* Unit types, for the usage chart and the Type column. Checked for colour-blind
      separation against --color-bg (dataviz validate_palette, all pairs). */
@@ -105,7 +107,8 @@ button {
   outline-offset: 1px;
 }
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+[tabindex="-1"]:focus-visible {
   outline: none;
 }
 
@@ -126,4 +129,21 @@ textarea:focus-visible {
 }
 .flash {
   animation: flash 1.8s ease-out;
+}
+
+/* The details sheet: a short slide from the right edge. */
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+.sheet-in {
+  animation: sheet-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in {
+    animation: none;
+  }
 }

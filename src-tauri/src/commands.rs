@@ -242,6 +242,12 @@ pub async fn resume_unit(state: State<'_, AppState>, bus: Bus, name: String) -> 
     Ok(())
 }
 
+/// Everything about one unit for the details panel.
+#[tauri::command]
+pub async fn unit_details(state: State<'_, AppState>, bus: Bus, name: String) -> Result<crate::details::Details, String> {
+    crate::details::details(&state.buses, bus, &name).await
+}
+
 // ── Groups ───────────────────────────────────────────────────────────────────
 
 /// Keep muffled groups muffled while the app runs (it autostarts in the tray):

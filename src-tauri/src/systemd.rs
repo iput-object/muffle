@@ -2,6 +2,10 @@
 //! the session bus (user services, autostart apps, launched app scopes).
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+use zbus::fdo::PropertiesProxy;
+use zbus::names::InterfaceName;
 use zbus::{Connection, OwnedObjectPath, proxy};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -42,6 +46,8 @@ type Change = (String, String, String);
 )]
 trait Manager {
     fn list_units(&self) -> zbus::Result<Vec<UnitRow>>;
+
+    fn get_unit(&self, name: &str) -> zbus::Result<OwnedObjectPath>;
 
     fn list_unit_files_by_patterns(
         &self,
@@ -168,6 +174,30 @@ impl Buses {
             .filter_map(|(path, state)| Some((path.rsplit('/').next()?.to_string(), state == "enabled")))
             .filter(|(name, _)| !name.contains('@'))
             .collect())
+    }
+
+    /// Every property of a loaded unit: the generic Unit interface plus the
+    /// Service or Scope one (exec, user, sandboxing, cgroup, main PID…).
+    pub async fn properties(&self, bus: Bus, name: &str) -> zbus::Result<HashMap<String, zbus::OwnedVariant>> {
+        let path = self.manager(bus).await?.get_unit(name).await?;
+        let conn = match bus {
+            Bus::System => &self.system,
+            Bus::Session => &self.session,
+        };
+        let props = PropertiesProxy::builder(conn)
+            .destination("org.freedesktop.systemd1")
+            .path(path)
+            .build()
+            .await?;
+        let mut out = props.get_all(InterfaceName::try_from("org.freedesktop.systemd1.Unit")?).await?;
+        let kind = if name.ends_with(".scope") { "Scope" } else { "Service" };
+        let iface = format!("org.freedesktop.systemd1.{kind}");
+        if let Ok(iface) = InterfaceName::try_from(iface.as_str()) {
+            if let Ok(more) = props.get_all(iface).await {
+                out.extend(more);
+            }
+        }
+        Ok(out)
     }
 
     pub async fn start(&self, bus: Bus, name: &str) -> zbus::Result<()> {

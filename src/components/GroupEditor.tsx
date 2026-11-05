@@ -104,9 +104,19 @@ export function GroupEditor({ group, units, onClose, onSaved, onError }: GroupEd
     <div
       className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 p-6"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
+      onKeyDown={(e) => {
+        if (e.key !== "Escape") return;
+        // Handled here: the details sheet underneath stays open.
+        e.preventDefault();
+        onClose();
+      }}
     >
-      <div className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl bg-bg shadow-2xl ring-1 ring-line">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={isNew ? "New group" : "Edit group"}
+        className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl bg-bg shadow-2xl ring-1 ring-line"
+      >
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-line pr-3 pl-5">
           <h2 className="text-title3">{isNew ? "New group" : "Edit group"}</h2>
           <IconButton icon={Cancel01Icon} label="Close" onClick={onClose} />

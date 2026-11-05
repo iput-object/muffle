@@ -20,6 +20,8 @@ export type Unit = {
   protected: boolean;
   /** Ids of the groups this unit belongs to (matched by app, across launches). */
   groups: string[];
+  /** Other scopes of the same app launch, folded into this row. */
+  siblings: string[];
 };
 
 export type UnitRef = { bus: Bus; name: string; label: string };
@@ -68,6 +70,59 @@ export type Settings = {
 
 export type SettingsView = Settings & { builtInProtected: string[] };
 
+/** One hardening directive and whether it's on. */
+export type SandboxSetting = {
+  /** The systemd directive, e.g. "ProtectSystem". */
+  key: string;
+  label: string;
+  value: string;
+  hardened: boolean;
+};
+
+export type ProcessInfo = {
+  pid: number;
+  ppid: number;
+  name: string;
+  /** Empty for kernel threads or when unreadable. */
+  cmdline: string;
+  user: string;
+  uid: number;
+  group: string;
+  /** As /proc says it, e.g. "S (sleeping)". */
+  state: string;
+  threads: number;
+  rssBytes: number;
+  /** Unix ms. */
+  started: number | null;
+  /** Effective capabilities, e.g. "CAP_NET_ADMIN". */
+  capabilities: string[];
+  allCapabilities: boolean;
+};
+
+export type UnitDetails = {
+  name: string;
+  bus: Bus;
+  description: string;
+  activeState: string;
+  subState: string;
+  /** "enabled", "disabled", "static", …; empty for scopes. */
+  unitFileState: string;
+  unitFile: string | null;
+  /** Unix ms. */
+  activeSince: number | null;
+  mainPid: number | null;
+  controlGroup: string | null;
+  /** Services only. */
+  exec: string | null;
+  restart: string | null;
+  user: string | null;
+  group: string | null;
+  dynamicUser: boolean;
+  /** Empty for app scopes. */
+  sandbox: SandboxSetting[];
+  processes: ProcessInfo[];
+};
+
 const unitArgs = (u: { bus: Bus; name: string }) => ({ bus: u.bus, name: u.name });
 
 export const unitRef = (u: Unit): UnitRef => ({ bus: u.bus, name: u.name, label: u.label });
@@ -79,6 +134,8 @@ export const api = {
   startUnit: (u: Unit) => invoke<void>("start_unit", unitArgs(u)),
   pauseUnit: (u: Unit) => invoke<void>("pause_unit", unitArgs(u)),
   resumeUnit: (u: Unit) => invoke<void>("resume_unit", unitArgs(u)),
+
+  unitDetails: (bus: Bus, name: string) => invoke<UnitDetails>("unit_details", { bus, name }),
 
   saveGroup: (group: Group) => invoke<Group>("save_group", { group }),
   deleteGroup: (id: string) => invoke<void>("delete_group", { id }),

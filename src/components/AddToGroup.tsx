@@ -21,8 +21,18 @@ export function AddToGroup({ unit, groups, onAdd, onNewGroup }: AddToGroupProps)
     const close = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
+    // On document, so it runs before window-level Esc handlers (the details sheet) and claims the key.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      e.preventDefault();
+      setOpen(false);
+    };
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   const inGroup = (g: GroupView) => unit.groups.includes(g.id);

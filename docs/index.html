@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>muffle</title>
+<meta name="description" content="A small Linux desktop app that switches whole groups of services and apps off and back on in one click. Muffle the background, give the build the CPU.">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0e0f11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f6f8" media="(prefers-color-scheme: light)">
+<meta property="og:title" content="muffle">
+<meta property="og:description" content="Muffle the background, give the build the CPU. Switch groups of Linux services and apps off and on in one click.">
+<meta property="og:image" content="https://iput-object.github.io/muffle/screenshots/running.png">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+<link rel="icon" type="image/png" sizes="128x128" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..650&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="preload" as="image" href="screenshots/running.png" fetchpriority="high">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="./" aria-label="muffle home">
+      <img src="icon.png" alt="" width="24" height="24">
+      <span>muffle</span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#cli">CLI</a>
+      <a href="#safety">Safety</a>
+      <a class="gh" href="https://github.com/iput-object/muffle">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero wrap">
+    <p class="eyebrow">Linux · systemd · free and open source</p>
+    <h1>Muffle the background,<br>give the build the CPU.</h1>
+    <p class="lede">
+      A small desktop app that lists what's running, turns startup on and off,
+      and switches whole <em>groups</em> of services and apps off and back on in one click.
+      Turn “Heavy stuff” off while you work, and back on afterwards.
+    </p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/iput-object/muffle/releases/latest">Download</a>
+      <a class="btn" href="#install">Install options</a>
+      <a class="btn quiet" href="https://github.com/iput-object/muffle">Source on GitHub</a>
+    </div>
+    <figure class="shot hero-shot">
+      <a href="screenshots/running.png">
+        <img src="screenshots/running.png" width="2200" height="1360" fetchpriority="high"
+             alt="The muffle window on the Running page: a memory meter split into apps, user services and system services with a short history graph, above a list of running units such as Google Chrome, Visual Studio Code, Firefox, a Docker container and ollama, each with its CPU and memory.">
+      </a>
+    </figure>
+  </section>
+
+  <section id="features" class="wrap features" aria-labelledby="features-h">
+    <h2 id="features-h" class="section-h">What it does</h2>
+
+    <article class="feature text-only">
+      <div class="copy">
+        <p class="kicker">Running</p>
+        <h3>Everything that's running, and what it costs</h3>
+        <p>Every running service and app with live CPU and memory. Stop, start or pause any of them.</p>
+      </div>
+      <ul class="aside-list">
+        <li>A memory (or CPU) meter for the whole machine, split into apps, user services and system services, with a short history graph.</li>
+        <li>Apps that run as several systemd scopes, like Chrome, show as one row.</li>
+        <li>Core system units are protected and hidden unless you ask for them.</li>
+      </ul>
+    </article>
+
+    <article class="feature">
+      <div class="copy">
+        <p class="kicker">Details</p>
+        <h3>Click a row to see what it is and what it can do</h3>
+        <p>A side panel with three tabs.</p>
+        <ul>
+          <li><strong>Overview</strong>: CPU, memory, processes and threads, whether it starts at boot, its unit file, command and restart policy.</li>
+          <li><strong>Permissions</strong>: the user and group it runs as, whether it's root, its kernel capabilities, and how many of systemd's ten common sandboxing protections are on.</li>
+          <li><strong>Processes</strong>: the process tree across every scope of the app, with user, state, threads and memory.</li>
+        </ul>
+      </div>
+      <div class="pair">
+        <figure class="shot">
+          <a href="screenshots/details-permissions.png">
+            <img src="screenshots/details-permissions.png" width="2200" height="1360" loading="lazy" decoding="async"
+                 alt="Details panel for bluetooth.service, Permissions tab: runs as root, limited to two capabilities, NET_ADMIN and NET_BIND_SERVICE; sandboxing shows 6 of 10 protections on.">
+          </a>
+          <figcaption>Permissions of a root service</figcaption>
+        </figure>
+        <figure class="shot">
+          <a href="screenshots/details-processes.png">
+            <img src="screenshots/details-processes.png" width="2200" height="1360" loading="lazy" decoding="async"
+                 alt="Details panel for Google Chrome, Processes tab: 35 processes using 3.6 GB from 2 scopes of the app, shown as a tree of chrome, zygote and renderer processes.">
+          </a>
+          <figcaption>Chrome's process tree, both scopes merged</figcaption>
+        </figure>
+      </div>
+    </article>
+
+    <article class="feature">
+      <div class="copy">
+        <p class="kicker">Groups</p>
+        <h3>Switch a whole set off, and back on</h3>
+        <p>Put services and apps in a group, then muffle it and restore it later. muffle only brings back what it turned off, even after a restart.</p>
+        <ul>
+          <li>A group blocks an <em>application</em>, not one process: a member matches every launch of the app, so the block survives relaunches and reboots.</li>
+          <li>While a group is muffled, muffle turns its members off again whenever they come back. This runs from the tray, which starts at login.</li>
+          <li>Three modes: <strong>Stop</strong> stops services and pauses open apps, <strong>Pause</strong> freezes everything and keeps its memory, <strong>Kill</strong> force-closes everything.</li>
+          <li>A unit can be in several groups. It only goes off once every group it's in is muffled, and comes back as soon as one is restored.</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <a href="screenshots/groups.png">
+          <img src="screenshots/groups.png" width="2200" height="1360" loading="lazy" decoding="async"
+               alt="The Groups page with four groups: Heavy stuff, Docker and Browsers are on, each listing members with their memory; Distractions is muffled in Pause mode, with Slack, Discord and Spotify paused.">
+        </a>
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="copy">
+        <p class="kicker">Startup</p>
+        <h3>What starts at login and at boot</h3>
+        <p>Turn login apps and boot services on or off. Disabled services are listed too, so you can switch them back on later.</p>
+      </div>
+      <figure class="shot">
+        <a href="screenshots/startup.png">
+          <img src="screenshots/startup.png" width="2200" height="1360" loading="lazy" decoding="async"
+               alt="The Startup page: login apps on the left (muffle, Slack, Evolution Alarm Notify on; Discord, Spotify, im-launch off) and services on the right with switches, 9 of 13 on.">
+        </a>
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="copy">
+        <p class="kicker">Search</p>
+        <h3>One search for everything</h3>
+        <p>Press <kbd>Ctrl</kbd> <kbd>F</kbd> on any page to search running units, groups and startup items at once. Pick a result to jump to it.</p>
+      </div>
+      <figure class="shot">
+        <a href="screenshots/search.png">
+          <img src="screenshots/search.png" width="2200" height="1360" loading="lazy" decoding="async"
+               alt="Search panel for the query docker, with hits in three sections: Running (docker and a Docker container), Groups (Docker, and Heavy stuff which includes docker) and Startup (docker, on).">
+        </a>
+      </figure>
+    </article>
+
+    <article class="feature">
+      <div class="copy">
+        <p class="kicker">Tray, settings and updates</p>
+        <h3>Out of the way until you need it</h3>
+        <ul>
+          <li>Muffle and restore groups from the tray without opening the window.</li>
+          <li>Refreshes only while the window is open; idle in the tray.</li>
+          <li>Add your own protected units. muffle updates itself from Settings.</li>
+        </ul>
+      </div>
+      <figure class="shot">
+        <a href="screenshots/settings.png">
+          <img src="screenshots/settings.png" width="2200" height="1360" loading="lazy" decoding="async"
+               alt="The Settings page: start at login, show tray icon, refresh interval, updates, a list of protected unit patterns, and keyboard shortcuts.">
+        </a>
+      </figure>
+    </article>
+  </section>
+
+  <section id="install" class="wrap doc" aria-labelledby="install-h">
+    <h2 id="install-h" class="section-h">Install</h2>
+    <div class="cols">
+      <div>
+        <h3>Download</h3>
+        <p>Get the AppImage, <code>.deb</code> or <code>.rpm</code> from the
+          <a href="https://github.com/iput-object/muffle/releases/latest">latest release</a>.</p>
+        <p>muffle updates itself from Settings → Updates.</p>
+      </div>
+      <div>
+        <h3>Arch Linux</h3>
+        <p>Install <code>muffle-bin</code> from the AUR:</p>
+        <pre><code>yay -S muffle-bin</code></pre>
+      </div>
+    </div>
+    <p class="muted">Needs a Linux desktop running systemd.</p>
+  </section>
+
+  <section id="cli" class="wrap doc" aria-labelledby="cli-h">
+    <h2 id="cli-h" class="section-h">Command line</h2>
+    <p>The same binary works from a terminal, without opening the window.</p>
+    <div class="table" role="region" aria-label="CLI commands" tabindex="0">
+      <table>
+        <tbody>
+          <tr><td><code>muffle</code></td><td>Open the app</td></tr>
+          <tr><td><code>muffle --hidden</code></td><td>Start in the tray</td></tr>
+          <tr><td><code>muffle list</code></td><td>Running services and apps with CPU and RAM</td></tr>
+          <tr><td><code>muffle groups</code></td><td>Groups and whether they're muffled</td></tr>
+          <tr><td><code>muffle status</code></td><td>Muffled groups only</td></tr>
+          <tr><td><code>muffle off &lt;group&gt;</code></td><td>Muffle a group (stop, pause or kill its members)</td></tr>
+          <tr><td><code>muffle on &lt;group&gt;</code></td><td>Restore what muffle turned off</td></tr>
+          <tr><td><code>muffle --version</code></td><td>Print the version</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Name a group by its name (any case) or its id. For example, in fish:</p>
+    <pre><code>muffle off heavy-stuff; and pnpm dev</code></pre>
+  </section>
+
+  <section id="files" class="wrap doc" aria-labelledby="files-h">
+    <h2 id="files-h" class="section-h">Files</h2>
+    <dl class="files">
+      <dt><code>~/.config/muffle/config.toml</code></dt>
+      <dd>Groups and settings. Safe to edit by hand.</dd>
+      <dt><code>~/.local/state/muffle/state.json</code></dt>
+      <dd>What muffle turned off, so it can undo it.</dd>
+    </dl>
+  </section>
+
+  <section id="safety" class="wrap doc" aria-labelledby="safety-h">
+    <h2 id="safety-h" class="section-h">Safety</h2>
+    <ul class="plain">
+      <li><strong>Protected units.</strong> muffle never stops the desktop session, audio, networking, D-Bus, polkit or systemd's own units. Add your own patterns in Settings.</li>
+      <li><strong>Password prompts.</strong> Stopping or disabling a system service goes through polkit, so your desktop may ask for your password. User services and apps don't need it.</li>
+      <li><strong>Blocks need muffle running.</strong> muffle keeps a muffled group off only while it runs in the tray. Leave “Start at login” on, or a blocked app can come back after a reboot until muffle starts.</li>
+      <li><strong>Kill is final for apps.</strong> A killed app can't be brought back by Restore; services start again.</li>
+      <li>Stopping system services can break things. If something goes wrong, restore the group or start the unit again from Running.</li>
+    </ul>
+  </section>
+
+  <section id="faq" class="wrap doc" aria-labelledby="faq-h">
+    <h2 id="faq-h" class="section-h">Questions</h2>
+    <details>
+      <summary>Does muffle need root?</summary>
+      <p>No. It talks to systemd over D-Bus as you. System services ask for authorization through polkit when needed.</p>
+    </details>
+    <details>
+      <summary>What does Pause do?</summary>
+      <p>It freezes the unit with systemd: no CPU at all, memory kept, and it resumes instantly on Restore.</p>
+    </details>
+    <details>
+      <summary>Why does an app pause or close again right after I open it?</summary>
+      <p>Group members match the app, not one launch of it. While its group is muffled, muffle turns it off again whenever it starts. Restore the group to let it run.</p>
+    </details>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span>muffle · GPL-3.0</span>
+    <a href="https://github.com/iput-object/muffle">github.com/iput-object/muffle</a>
+  </div>
+</footer>
+</body>
+</html>

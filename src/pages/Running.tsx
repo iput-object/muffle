@@ -9,6 +9,7 @@ import { UsageChart } from "../components/UsageChart";
 import { unitType, type UnitType } from "../utils/unitType";
 import { unitTitles } from "../utils/displayName";
 import { useFlash, type Flash } from "../hooks/useFlash";
+import { DetailsPanel } from "../components/details/DetailsPanel";
 
 type RunningProps = {
   snapshot: Snapshot | null;
@@ -28,6 +29,8 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query,
   const [busy, setBusy] = useState<Set<string>>(new Set());
   /** Units stopped from here this session, kept so they can be started again. */
   const [stopped, setStopped] = useState<Map<string, Unit>>(new Map());
+  /** The unit whose details are open, as it was when last seen. */
+  const [inspected, setInspected] = useState<Unit | null>(null);
 
   const running = snapshot?.units ?? [];
   const groups = snapshot?.groups ?? [];
@@ -90,9 +93,24 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query,
     }
   }
 
+  // Follow the live row; keep the last copy once it's gone, for the "no longer running" state.
+  const inspectedLive = inspected ? (byId.get(inspected.id) ?? stopped.get(inspected.id) ?? inspected) : null;
+
+  function closeDetails() {
+    const id = inspected?.id;
+    setInspected(null);
+    // Back to the row it came from, for keyboard users.
+    if (id)
+      document
+        .querySelector<HTMLElement>(`[data-flash-id="${CSS.escape(id)}"] [data-open]`)
+        ?.focus({ preventScroll: true });
+  }
+
   const rowProps = (unit: Unit) => ({
     unit,
     groups,
+    selected: inspected?.id === unit.id,
+    onOpen: () => (inspected?.id === unit.id ? closeDetails() : setInspected(unit)),
     busy: busy.has(unit.id),
     onAction: (action: RowAction) => act(unit, action),
     onAddToGroup: (group: GroupView) => addToGroup(unit, group),
@@ -100,47 +118,59 @@ export default function Running({ snapshot, refresh, notify, onEditGroup, query,
   });
 
   return (
-    <Page className="pt-0">
-      {snapshot && (
-        <div className="-mx-4 pt-5 pb-4">
-          <UsageChart snapshot={snapshot} filter={filter} onFilter={setFilter} />
-        </div>
-      )}
-
-      {/* Inside the scroller so it shares the rows' grid, padding and scrollbar gutter. */}
-      <div
-        className={cn(
-          "sticky top-0 z-10 -mx-4 grid gap-3 border-b border-line bg-bg px-4 py-2 text-subheadline text-muted",
-          ROW_GRID,
+    <>
+      <Page className="pt-0">
+        {snapshot && (
+          <div className="-mx-4 pt-5 pb-4">
+            <UsageChart snapshot={snapshot} filter={filter} onFilter={setFilter} />
+          </div>
         )}
-      >
-        <span className="col-span-2">Name</span>
-        <TypeFilter
-          value={filter}
-          onChange={setFilter}
-          counts={typeCounts}
-          showProtected={showProtected}
-          onShowProtected={setShowProtected}
-          protectedCount={protectedCount}
-        />
-        <span className="text-right">CPU</span>
-        <span className="text-right">Memory</span>
-      </div>
 
-      {!snapshot ? (
-        <Empty>Loading…</Empty>
-      ) : visible.length === 0 && stoppedList.length === 0 ? (
-        <Empty>Nothing matches.</Empty>
-      ) : (
-        <ul className="-mx-4 pt-1">
-          {stoppedList.map((unit) => (
-            <UnitRow key={unit.id} stopped {...rowProps(unit)} />
-          ))}
-          {visible.map((unit) => (
-            <UnitRow key={unit.id} stopped={false} {...rowProps(unit)} />
-          ))}
-        </ul>
+        {/* Inside the scroller so it shares the rows' grid, padding and scrollbar gutter. */}
+        <div
+          className={cn(
+            "sticky top-0 z-10 -mx-4 grid gap-3 border-b border-line bg-bg px-4 py-2 text-subheadline text-muted",
+            ROW_GRID,
+          )}
+        >
+          <span className="col-span-2">Name</span>
+          <TypeFilter
+            value={filter}
+            onChange={setFilter}
+            counts={typeCounts}
+            showProtected={showProtected}
+            onShowProtected={setShowProtected}
+            protectedCount={protectedCount}
+          />
+          <span className="text-right">CPU</span>
+          <span className="text-right">Memory</span>
+        </div>
+
+        {!snapshot ? (
+          <Empty>Loading…</Empty>
+        ) : visible.length === 0 && stoppedList.length === 0 ? (
+          <Empty>Nothing matches.</Empty>
+        ) : (
+          <ul className="-mx-4 pt-1">
+            {stoppedList.map((unit) => (
+              <UnitRow key={unit.id} stopped {...rowProps(unit)} />
+            ))}
+            {visible.map((unit) => (
+              <UnitRow key={unit.id} stopped={false} {...rowProps(unit)} />
+            ))}
+          </ul>
+        )}
+      </Page>
+
+      {inspectedLive && (
+        <DetailsPanel
+          {...rowProps(inspectedLive)}
+          stopped={stopped.has(inspectedLive.id) && !byId.has(inspectedLive.id)}
+          running={byId.has(inspectedLive.id)}
+          tick={snapshot}
+          onClose={closeDetails}
+        />
       )}
-    </Page>
+    </>
   );
 }

@@ -1,6 +1,7 @@
 mod apps;
 mod cli;
 mod commands;
+mod details;
 mod groups;
 mod metrics;
 mod protect;
@@ -81,6 +82,7 @@ pub fn run() {
             commands::start_unit,
             commands::pause_unit,
             commands::resume_unit,
+            commands::unit_details,
             commands::save_group,
             commands::delete_group,
             commands::add_to_group,
